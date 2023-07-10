@@ -3,10 +3,14 @@ import os
 import requests
 import re
 import json
+import io
 
+from google.cloud import storage
+from google.oauth2 import service_account
 # from google.cloud import bigquery
 # from google.oauth2 import service_account
-# import pandas as pd
+import pandas as pd
+from fastavro import writer, parse_schema
 
 
 def clean_html(raw_html: str) -> str:
@@ -15,11 +19,11 @@ def clean_html(raw_html: str) -> str:
     return clean_text
 
 
-def get_news_data(request):
-    # credentials = service_account.Credentials.from_service_account_file('credentials/hyoju-387406-6c08af939a41.json')
-    # client = bigquery.Client(credentials = credentials, project = credentials.project_id)
+def get_news_data():
+    # credentials = service_account.Credentials.from_service_account_file('credentials/hyoju_service_account.json')
+    # client = bigquery.Client(credentials=credentials, project=credentials.project_id)
 
-    # naver_api_credentials = json.load(open('credentials/hyoju_naver_search_api.json'))
+    naver_api_credentials = json.load(open('credentials/hyoju_naver_search_api.json'))
     naver_api_credentials = {
         'id': os.environ['NAVER_SEARCH_API_ID'],
         'secret': os.environ['NAVER_SEARCH_API_SECRET']
@@ -38,6 +42,49 @@ def get_news_data(request):
     }
 
     return requests.get('https://openapi.naver.com/v1/search/news.json', headers=headers, params=params).json()
+
+
+def save_to_gcs(request):
+    # start_date = datetime.now()
+    # end_date = start_date + timedelta(minutes=1)
+
+    schema = {
+        'doc': 'news_data',
+        'name': 'news_data',
+        'namespace': 'news_data',
+        'type': 'record',
+        'fields': [
+            {'name': 'title', 'type': 'string'},
+            {'name': 'description', 'type': 'string'},
+            {'name': 'originallink', 'type': 'string'},
+            {'name': 'link', 'type': 'string'},
+            {'name': 'pubDate', 'type': 'int', 'logicalType': 'date'}
+        ]
+    }
+    parsed_schema = parse_schema(schema)
+
+    resp = get_news_data()
+
+    df = pd.DataFrame(resp['items'])
+    df['title'] = df['title'].apply(lambda x: clean_html(x))
+    df['description'] = df['description'].apply(lambda x: clean_html(x))
+    df['pubDate'] = df['pubDate'].apply(lambda x: datetime.strptime(x, "%a, %d %b %Y %H:%M:%S %z").timestamp())
+    print(df)
+
+    credentials = service_account.Credentials.from_service_account_file('credentials/hyoju-387406-6c08af939a41.json')
+    client = storage.Client(project=credentials.project_id)
+    bucket = client.get_bucket(os.environ['BUCKET.NAME'])
+
+    with io.BytesIO() as bytesio:
+        writer(bytesio, parsed_schema, df.to_dict('records'))
+    bucket.blob('test/test.avro').upload_from_string(bytesio)
+
+    # with open('test_avro.avro', 'wb') as w:
+    #     writer(w, parsed_schema, df.to_dict('records'))
+
+save_to_gcs(0)
+
+
 
 # print(type(resp['items'][0]['pubDate']), resp['items'][0]['pubDate'])
 # pub_date_dt = datetime.strptime(resp['items'][0]['pubDate'], "%a, %d %b %Y %H:%M:%S %z")
