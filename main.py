@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import requests
 import re
@@ -23,10 +23,10 @@ def get_news_data():
     # credentials = service_account.Credentials.from_service_account_file('credentials/hyoju_service_account.json')
     # client = bigquery.Client(credentials=credentials, project=credentials.project_id)
 
-    naver_api_credentials = json.load(open('credentials/hyoju_naver_search_api.json'))
+    # naver_api_credentials = json.load(open('credentials/hyoju_naver_search_api.json'))
     naver_api_credentials = {
-        'id': os.environ['NAVER_SEARCH_API_ID'],
-        'secret': os.environ['NAVER_SEARCH_API_SECRET']
+        'id': os.environ['NAVER_SEARCH_API.ID'],
+        'secret': os.environ['NAVER_SEARCH_API.SECRET']
     }
 
     headers = {
@@ -44,9 +44,9 @@ def get_news_data():
     return requests.get('https://openapi.naver.com/v1/search/news.json', headers=headers, params=params).json()
 
 
-def save_to_gcs(request):
-    # start_date = datetime.now()
-    # end_date = start_date + timedelta(minutes=1)
+def news_data_save_to_gcs(request):
+    end_date = datetime.now()
+    start_date = end_date - timedelta(minutes=10)
 
     schema = {
         'doc': 'news_data',
@@ -68,21 +68,24 @@ def save_to_gcs(request):
     df = pd.DataFrame(resp['items'])
     df['title'] = df['title'].apply(lambda x: clean_html(x))
     df['description'] = df['description'].apply(lambda x: clean_html(x))
+    
     df['pubDate'] = df['pubDate'].apply(lambda x: datetime.strptime(x, "%a, %d %b %Y %H:%M:%S %z").timestamp())
-    print(df)
+    filtered_df = df.loc[(df['pubDate'] >= start_date.timestamp())
+                         & (df['pubDate'] < end_date.timestamp())]
+    print(filtered_df)
 
-    credentials = service_account.Credentials.from_service_account_file('credentials/hyoju-387406-6c08af939a41.json')
-    client = storage.Client(project=credentials.project_id)
+    # credentials = service_account.Credentials.from_service_account_file('credentials/hyoju_service_account.json')
+    # client = storage.Client(project=credentials.project_id)
+    client = storage.Client(project=os.environ['PROJECT.ID'])
     bucket = client.get_bucket(os.environ['BUCKET.NAME'])
 
-    with io.BytesIO() as bytesio:
-        writer(bytesio, parsed_schema, df.to_dict('records'))
-    bucket.blob('test/test.avro').upload_from_string(bytesio)
+    bytesio = io.BytesIO()
+    writer(bytesio, parsed_schema, df.to_dict('records'))
+    start_date_str = start_date.strftime('%Y%m%d%H%M%S')
+    end_date_str = end_date.strftime('%Y%m%d%H%M%S')
+    bucket.blob(f'raw_data/{start_date_str}_{end_date_str}.avro').upload_from_file(bytesio, rewind=True)
 
-    # with open('test_avro.avro', 'wb') as w:
-    #     writer(w, parsed_schema, df.to_dict('records'))
-
-save_to_gcs(0)
+    return {'status': 'success'}
 
 
 

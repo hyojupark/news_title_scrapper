@@ -1,1 +1,1 @@
-gcloud functions deploy get_news_data --runtime python38 --trigger-http --env-vars-file=credentials/hyoju_naver_search_api.yaml
+gcloud functions deploy news_data_save_to_gcs --runtime python38 --trigger-http --env-vars-file=credentials/env.yaml
