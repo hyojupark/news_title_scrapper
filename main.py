@@ -45,8 +45,8 @@ def get_news_data():
 
 
 def news_data_save_to_gcs(request):
-    end_date = datetime.now()
-    start_date = end_date - timedelta(minutes=10)
+    end_date = datetime.utcnow() + timedelta(hours=9)
+    start_date = end_date - timedelta(minutes=1)
 
     schema = {
         'doc': 'news_data',
@@ -58,7 +58,7 @@ def news_data_save_to_gcs(request):
             {'name': 'description', 'type': 'string'},
             {'name': 'originallink', 'type': 'string'},
             {'name': 'link', 'type': 'string'},
-            {'name': 'pubDate', 'type': 'int', 'logicalType': 'date'}
+            {'name': 'pubDate', 'type': {'type': 'long', 'logicalType': 'timestamp-millis'}}
         ]
     }
     parsed_schema = parse_schema(schema)
@@ -69,9 +69,9 @@ def news_data_save_to_gcs(request):
     df['title'] = df['title'].apply(lambda x: clean_html(x))
     df['description'] = df['description'].apply(lambda x: clean_html(x))
     
-    df['pubDate'] = df['pubDate'].apply(lambda x: datetime.strptime(x, "%a, %d %b %Y %H:%M:%S %z").timestamp())
-    filtered_df = df.loc[(df['pubDate'] >= start_date.timestamp())
-                         & (df['pubDate'] < end_date.timestamp())]
+    df['pubDate'] = df['pubDate'].apply(lambda x: datetime.strptime(x, "%a, %d %b %Y %H:%M:%S %z").timestamp() * 1000)
+    filtered_df = df.loc[(df['pubDate'] >= start_date.timestamp() * 1000)
+                         & (df['pubDate'] < end_date.timestamp() * 1000)]
     print(filtered_df)
 
     # credentials = service_account.Credentials.from_service_account_file('credentials/hyoju_service_account.json')
@@ -80,7 +80,7 @@ def news_data_save_to_gcs(request):
     bucket = client.get_bucket(os.environ['BUCKET.NAME'])
 
     bytesio = io.BytesIO()
-    writer(bytesio, parsed_schema, df.to_dict('records'))
+    writer(bytesio, parsed_schema, filtered_df.to_dict('records'))
     start_date_str = start_date.strftime('%Y%m%d%H%M%S')
     end_date_str = end_date.strftime('%Y%m%d%H%M%S')
     bucket.blob(f'raw_data/{start_date_str}_{end_date_str}.avro').upload_from_file(bytesio, rewind=True)
