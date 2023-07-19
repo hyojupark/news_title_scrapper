@@ -42,7 +42,7 @@ def get_news_data():
 
 
 def news_data_save_to_gcs(request):
-    end_date = datetime.utcnow() + timedelta(hours=9)
+    end_date = datetime.utcnow().replace(second=0, microsecond=0) + timedelta(hours=9)
     start_date = end_date - timedelta(minutes=1)
 
     schema = {
