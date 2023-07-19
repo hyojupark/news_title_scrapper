@@ -84,6 +84,3 @@ def news_data_save_to_gcs(request):
         bucket.blob(f'raw_data/{start_date_str}_{end_date_str}.avro').upload_from_file(bytesio, rewind=True)
 
     return {'status': 'success'}
-
-
-news_data_save_to_gcs('test')
