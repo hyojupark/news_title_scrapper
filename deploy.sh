@@ -1,1 +1,1 @@
-gcloud functions deploy news_data_save_to_gcs --runtime python38 --entry-point run --trigger-http --env-vars-file=credentials/env.yaml
+gcloud functions deploy news_data_save_to_gcs --gen2 --runtime python38 --entry-point run --trigger-http --env-vars-file=credentials/env.yaml --region=us-central1
