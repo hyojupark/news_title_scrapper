@@ -18,7 +18,7 @@ def clean_html(raw_html: str) -> str:
 
 
 def get_news_data():
-    # credentials = service_account.Credentials.from_service_account_file('credentials/hyoju_service_account.json')
+    # credentials = service_account.Credentials.from_service_account_file('credentials/news-analysis_service-account.json')
     # naver_api_credentials = json.load(open('credentials/hyoju_naver_search_api.json'))
 
     naver_api_credentials = {
@@ -41,7 +41,7 @@ def get_news_data():
     return requests.get('https://openapi.naver.com/v1/search/news.json', headers=headers, params=params).json()
 
 
-def news_data_save_to_gcs(request):
+def run(request):
     end_date = datetime.now().replace(second=0, microsecond=0)
     start_date = end_date - timedelta(minutes=1)
 
@@ -72,7 +72,7 @@ def news_data_save_to_gcs(request):
     print(filtered_df)
 
     if not filtered_df.empty:
-        # credentials = service_account.Credentials.from_service_account_file('credentials/hyoju_service_account.json')
+        # credentials = service_account.Credentials.from_service_account_file('credentials/news-analysis_service-account.json')
         # client = storage.Client(project=credentials.project_id)
         client = storage.Client(project=os.environ['PROJECT.ID'])
         bucket = client.get_bucket(os.environ['BUCKET.NAME'])
